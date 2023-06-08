@@ -12,14 +12,18 @@ import SendIcon from "@mui/icons-material/Send";
 import React, { useState } from "react";
 import { useParams } from "react-router-dom";
 import MessageCard from "../components/MessageCard";
-import { useMutation, useQuery } from "@apollo/client";
+import { useMutation, useQuery, useSubscription } from "@apollo/client";
 import { GET_MSG } from "../graphql/queries";
 import { SEND_MSG } from "../graphql/mutation";
+import { MSG_SUB } from "../graphql/subscription";
+import jwt_decode from "jwt-decode";
 
 const ChatScreen = () => {
   const { id, name } = useParams();
   const [text, setText] = useState("");
   const [messages, setMessages] = useState([]);
+  const { userId } = jwt_decode(localStorage.getItem("jwt"));
+
   const { data, loading, error } = useQuery(GET_MSG, {
     variables: {
       receiverId: +id,
@@ -30,9 +34,21 @@ const ChatScreen = () => {
   });
 
   const [sendMessage] = useMutation(SEND_MSG, {
-    onCompleted(data) {
-      console.log("createdMesage: ", data.createMessage);
-      setMessages((prevMessages) => [...prevMessages, data.createMessage]);
+    // onCompleted(data) {
+    //   setMessages((prevMessages) => [...prevMessages, data.createMessage]);
+    // },
+  });
+
+  const { data: subData } = useSubscription(MSG_SUB, {
+    onSubscriptionData({ subscriptionData: { data } }) {
+      if (
+        (data.messageAdded.receiverId == +id &&
+          data.messageAdded.senderId == userId) ||
+        (data.messageAdded.receiverId == userId &&
+          data.messageAdded.senderId == +id)
+      ) {
+        setMessages((prevMessages) => [...prevMessages, data.messageAdded]);
+      }
     },
   });
 
